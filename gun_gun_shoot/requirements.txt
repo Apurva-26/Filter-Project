@@ -1,0 +1,12 @@
+# Install everything with:   py -m pip install -r requirements.txt
+# (on the Pi, inside the virtual environment:   pip install -r requirements.txt)
+
+mediapipe>=1.2.2
+opencv-python>=5.0
+numpy>=2.0
+pygame>=2.6
+
+# Pinned EXACTLY: a model saved by one scikit-learn version often won't load in another.
+# If you change this, re-run train.py.
+scikit-learn==1.8.0
+joblib>=1.5

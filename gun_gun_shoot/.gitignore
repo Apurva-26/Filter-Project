@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# VS Code local history
+.history/
+
+# Per-machine files (each computer makes its own)
+data/opponent_memory.json
+data/distance_calibration.json
