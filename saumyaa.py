@@ -16,6 +16,8 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 import numpy as np
 
+import kiosk  # touchscreen Back button (see kiosk.py)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TASK_PATH = os.path.join(SCRIPT_DIR, "face_landmarker.task")
 TASK_URL = (
@@ -297,6 +299,7 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     people = []
+    screen = kiosk.Kiosk("Hallway Iris Filter")
     print("Running. Press 'q' or Esc to quit.")
 
     while True:
@@ -314,8 +317,8 @@ def main():
         face_data = extract_face_data(result.face_landmarks, w, h) if result.face_landmarks else []
         apply_filter(frame, face_data, people, textures, time.monotonic())
 
-        cv2.imshow("Hallway Iris Filter", frame)
-        key = cv2.waitKey(1) & 0xFF
+        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
+        key = screen.show(frame, person_seen=bool(face_data))
         if key in (ord('q'), ord('Q'), 27):
             break
         if cv2.getWindowProperty("Hallway Iris Filter", cv2.WND_PROP_VISIBLE) < 1:

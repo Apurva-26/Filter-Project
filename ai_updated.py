@@ -4,6 +4,8 @@ import urllib.request
 import cv2
 import numpy as np
 
+import kiosk  # touchscreen Back button + on-screen buttons (see kiosk.py)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(
@@ -179,6 +181,9 @@ def main():
     print("  F = Switch filters")
     print("  Q = Quit")
 
+    # On-screen buttons that press the same keys as above
+    screen = kiosk.Kiosk("Face Filters", buttons=[("On / Off", "n"), ("Switch", "f")])
+
     while True:
 
         ret, frame = cap.read()
@@ -251,12 +256,8 @@ def main():
             2
         )
 
-        cv2.imshow(
-            "Face Filters",
-            frame
-        )
-
-        key = cv2.waitKey(1) & 0xFF
+        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
+        key = screen.show(frame, person_seen=faces is not None)
 
         if key == ord('n'):
             filter_enabled = not filter_enabled

@@ -90,6 +90,11 @@ LEAVE_TIMEOUT_S = 5.0         # nobody in front of the camera this long -> game 
 LEFT_S = 3.0                  # "Game ended" message
 GAME_OVER_S = 15.0            # win/lose screen, then back to the title screen
 
+# Launcher (../launcher.py) support. The launcher sets FILTER_KIOSK=1 when it starts the game.
+KIOSK_MODE = os.environ.get("FILTER_KIOSK") == "1"
+AUTO_BACK_S = 20.0            # kiosk mode: nobody in front of the camera this long -> back to the menu
+BACK_BUTTON = (-150, 20, 130, 60)  # x (negative = from the right edge), y, width, height
+
 # Framing check. The distance zone (1.0 - 1.5 m) is set in distance.py.
 MIN_NOSE_Y_FRAC = 0.18        # nose higher than this (fraction of the screen height from the top)
                               # = no room above the head for reload
@@ -361,7 +366,8 @@ class Game:
 
         self.vis = None                 # newest VisionResult
         self.last_seq = -1
-        self.last_person_time = 0.0
+        self.last_person_time = time.monotonic()
+        self.quit_requested = False     # set by the Back button / auto-back; main() then exits
         self._camera_surface = None     # the camera frame, converted for pygame
 
     # --- state helpers ---
@@ -402,6 +408,24 @@ class Game:
 
     # --- input ---
 
+    def back_button_rect(self) -> pygame.Rect:
+        x, y, w, h = BACK_BUTTON
+        return pygame.Rect(x + self.paint.w if x < 0 else x, y, w, h)
+
+    def on_click(self, pos) -> bool:
+        """A click/tap somewhere on the screen. Returns True if it hit the Back button."""
+        if self.back_button_rect().collidepoint(pos):
+            self.opponent.save()
+            self.quit_requested = True
+            return True
+        return False
+
+    def draw_back_button(self):
+        r = self.back_button_rect()
+        self.paint.panel((r.x, r.y, r.w, r.h), GREY, alpha=210)
+        pygame.draw.rect(self.screen, WHITE, r, 2, border_radius=18)
+        self.paint.text("< Back", r.center, 40)
+
     def on_tap(self):
         if self.state in ("attract", "game_over"):
             self.new_game()
@@ -410,6 +434,12 @@ class Game:
 
     def update(self):
         now = time.monotonic()
+
+        # Kiosk mode: nobody in front of the camera for a while -> back to the launcher menu
+        if KIOSK_MODE and now - self.last_person_time > AUTO_BACK_S:
+            self.opponent.save()
+            self.quit_requested = True
+            return
 
         # Pick up the newest camera result
         self.vis = self.vision.latest()
@@ -590,7 +620,7 @@ class Game:
 
     def _draw_scoreboard(self):
         p = self.paint
-        for side, label, x, anchor in (("player", "YOU", 20, "topleft"), ("ai", "CPU", p.w - 300, "topleft")):
+        for side, label, x, anchor in (("player", "YOU", 20, "topleft"), ("ai", "CPU", p.w - 460, "topleft")):
             p.panel((x, 20, 280, 120))
             p.text(label, (x + 20, 32), 52, YELLOW, anchor=anchor)
             p.text(f"Bullets: {self.gs.bullets(side)}", (x + 20, 78), 40, anchor=anchor)
@@ -668,12 +698,17 @@ def main():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and game.on_click(event.pos):
+                    pass  # it was the Back button
                 elif is_tap(event):
                     game.on_tap()
             if vision.error:
                 raise vision.error
             game.update()
             game.draw()
+            game.draw_back_button()
+            if game.quit_requested:
+                running = False
             pygame.display.flip()
             clock.tick(60)  # redraw the screen up to 60 times a second
     finally:

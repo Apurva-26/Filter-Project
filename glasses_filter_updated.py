@@ -13,6 +13,8 @@ import urllib.request
 import cv2
 import numpy as np
 
+import kiosk  # touchscreen Back button + on-screen buttons (see kiosk.py)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, 'face_detection_yunet_2023mar.onnx')
 MODEL_URL = ('https://github.com/opencv/opencv_zoo/raw/main/models/'
@@ -216,11 +218,19 @@ def main():
     detector = cv2.FaceDetectorYN.create(
         MODEL_PATH, '', (640, 480), score_threshold=0.8
     )
+    # On-screen buttons that press the same keys as the 1-4 controls below
+    screen = kiosk.Kiosk('Glasses Filter', buttons=[
+        ("Big Eyes", "1"), ("Glasses", "2"), ("Both", "3"), ("None", "4")])
+
     print()
     print("Press Y to enable the filter.")
     print("Press any other key to exit.")
 
-    if input("> ").strip().lower() != "y":
+    # Same question as before, but asked on the screen (a touchscreen has no keyboard):
+    # tap Start or press Y to enable; tap Back or press any other key to exit.
+    if not screen.ask(cap, "Enable the filter?", yes_label="Start", yes_key="y"):
+        cap.release()
+        cv2.destroyAllWindows()
         return
     print("Running.")
     print("1 = Big Eyes")
@@ -244,6 +254,7 @@ def main():
         detector.setInputSize((w, h))
 
         _, faces = detector.detect(frame)
+        face_seen = faces is not None  # for the auto-back timer (before the last_faces fallback)
         if faces is not None:
             last_faces = faces
         elif last_faces is not None:
@@ -346,8 +357,8 @@ def main():
             (0, 255, 0),
             2
         )
-        cv2.imshow('Glasses Filter', frame)
-        key = cv2.waitKey(1) & 0xFF
+        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
+        key = screen.show(frame, person_seen=face_seen)
 
         if key == ord('1'):
             current_filter = 1

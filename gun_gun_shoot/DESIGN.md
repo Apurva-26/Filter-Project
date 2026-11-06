@@ -194,13 +194,21 @@ Now it works in four steps:
 - `opponent.py`: the AI. `py opponent.py` plays against it in the terminal with no camera.
 - `game.py`: the full game. `py game.py` on the laptop; `py game.py --fullscreen --touch` on the Pi.
 - Develop and collect on a laptop, then deploy to the Pi 5. Record training data with the camera at roughly the same height and distance as the hallway setup.
-- **GitHub:** this is a group project. Everyone's filter goes in the shared repo `Apurva-26/Filter-Project`, each in its own folder. This one is in `gun_gun_shoot/`. Run every script from inside that folder (`cd gun_gun_shoot`, then `py game.py`); the files import each other by name (`import features`), not as a package. A launcher UI connecting all the filters comes later. Not committed (`.gitignore`): `__pycache__/`, `.history/`, `data/opponent_memory.json` and `data/distance_calibration.json` (both are per machine).
+- **GitHub:** this is a group project. Everyone's filter goes in the shared repo `Apurva-26/Filter-Project`, each in its own folder. This one is in `gun_gun_shoot/`. Run every script from inside that folder (`cd gun_gun_shoot`, then `py game.py`); the files import each other by name (`import features`), not as a package. The shared launcher is described in §8.1. Not committed (`.gitignore`): `__pycache__/`, `.history/`, `data/opponent_memory.json` and `data/distance_calibration.json` (both are per machine).
+
+### 8.1 Shared launcher (repo root)
+- `launcher.py`: a home screen with one big tile per filter: **Clown Nose** (`ai_updated.py`), **Glasses** (`glasses_filter_updated.py`), **Iris Colors** (`saumyaa.py`) and **Mystery** (this game; it has no name on screen). Headline "Tap a filter to try it!" and footnote "The camera only runs while you use a filter. Nothing is recorded or saved." Tiles have simple drawn icons, so no image files are needed.
+- Tapping a tile closes the menu window and runs the filter as its **own program** (in its own folder). When the filter exits, the menu comes back. If it crashes, the menu shows "Sorry, X isn't working right now." The menu never opens the camera.
+- The tile list lives in `filters.json` (name, script, icon, color, args, kiosk_args).
+- `py launcher.py --fullscreen` (on the Pi) sets `FILTER_KIOSK=1` for the filters: fullscreen, plus **auto-back after 20 s** with nobody in front of the camera.
+- `kiosk.py`: a shared helper for the OpenCV filters. It adds a **Back button (top-right)** that acts like pressing `q`, **on-screen buttons that press the filter's existing keys** (Clown Nose: On/Off = `n`, Switch = `f`; Glasses: `1`–`4`), and the auto-back. Glasses' terminal "Press Y to enable" question is now asked on screen (Start = `y`). The filters' behavior is otherwise unchanged.
+- This game draws its own Back button (top-right; the CPU scoreboard moved left to make room) and auto-backs after 20 s in kiosk mode. The launcher starts it with `--touch` (and `--fullscreen` in kiosk mode).
+- Model files are committed next to the scripts (`face_detection_yunet_2023mar.onnx`, `face_landmarker.task`), so the Pi needs no internet. Still missing from the repo: `clown nose.png` and `glasses.png`.
 
 ## 9. Open questions
 - Tuning the timings (gun gap, shoot gap, grace, capture window, hold, leave-timeout) through real play.
 - Symbols/animations for the moves (currently text on colored cards).
 - Difficulty levels (currently one fixed `MAX_EXPLOIT`).
-- The shared launcher UI for all the group's filters.
 - Recording the real sounds (`sounds/*.wav`).
 - Kiosk-mode setup on the Pi.
 - Privacy/permission from the school administration.

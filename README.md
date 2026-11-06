@@ -10,3 +10,8 @@ Team: Saumyaa, Tristan, Apurva, Timmy
 ## Labels to create
 - user: on purpose, user: passerby, user: maintainer, user: excluded
 - priority: high, priority: medium, priority: low
+
+## Running the filters
+- `py launcher.py` shows the menu (tap a tile to start a filter, Back returns to the menu).
+- On the Pi: `python launcher.py --fullscreen` (fullscreen + auto-back after 20 s with nobody there).
+- The tiles are listed in `filters.json`. OpenCV filters use `kiosk.py` for the Back button and touch buttons.
