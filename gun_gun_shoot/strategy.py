@@ -49,7 +49,7 @@ import itertools
 
 import numpy as np
 
-import gun_gun_shoot.rules as rules
+import rules
 
 # =============================================================================
 # Settings

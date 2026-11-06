@@ -36,7 +36,7 @@ from datetime import datetime
 
 import cv2
 
-import gun_gun_shoot.features as features
+import features
 
 # =============================================================================
 # Session settings (change these to make sessions longer/shorter)

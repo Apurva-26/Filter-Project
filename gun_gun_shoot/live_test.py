@@ -23,12 +23,12 @@ import time
 
 import cv2
 
-import gun_gun_shoot.features as features
-from gun_gun_shoot.classifier import (
+import features
+from classifier import (
     CAPTURE_WINDOW_S, CONF_THRESHOLD, GRACE_S, GUN_GAP_S, MOVES, SHOOT_AT_S, MoveLocker, PoseClassifier,
     confident_move,
 )
-from gun_gun_shoot.collect import GREEN, RED, WHITE, YELLOW, put_centered, put_text
+from collect import GREEN, RED, WHITE, YELLOW, put_centered, put_text
 
 # The classifier, lock-in logic and their settings live in classifier.py (shared with game.py).
 RESULT_S = 2.0  # how long the result stays on screen

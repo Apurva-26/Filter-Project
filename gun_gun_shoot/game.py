@@ -46,13 +46,13 @@ import cv2
 import numpy as np
 import pygame
 
-import gun_gun_shoot.distance as distance
-import gun_gun_shoot.features as features
-import gun_gun_shoot.rules as rules
-from gun_gun_shoot.classifier import (
+import distance
+import features
+import rules
+from classifier import (
     CAPTURE_WINDOW_S, GRACE_S, GUN_GAP_S, SHOOT_AT_S, MoveLocker, PoseClassifier, confident_move,
 )
-from gun_gun_shoot.opponent import Opponent
+from opponent import Opponent
 
 # =============================================================================
 # >>> TOUCHSCREEN SWITCH <<<

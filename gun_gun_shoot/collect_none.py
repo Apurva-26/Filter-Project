@@ -20,7 +20,7 @@ Tip: anyone can record this, even people who don't know the game, because
 there are no poses to learn. Great for getting lots of different people quickly.
 """
 
-import gun_gun_shoot.collect as collect
+import collect
 
 TAKES_PER_PROMPT = 2  # each prompt is recorded this many times
 

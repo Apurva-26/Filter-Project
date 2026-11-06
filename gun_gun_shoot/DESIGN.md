@@ -194,7 +194,7 @@ Now it works in four steps:
 - `opponent.py`: the AI. `py opponent.py` plays against it in the terminal with no camera.
 - `game.py`: the full game. `py game.py` on the laptop; `py game.py --fullscreen --touch` on the Pi.
 - Develop and collect on a laptop, then deploy to the Pi 5. Record training data with the camera at roughly the same height and distance as the hallway setup.
-- **GitHub:** this is a group project. Everyone's filter goes in the shared repo `Apurva-26/Filter-Project`, each in its own folder. This one goes in `gun-gun-shoot/`. A launcher UI connecting all the filters comes later. Not committed (`.gitignore`): `__pycache__/`, `.history/`, `data/opponent_memory.json` and `data/distance_calibration.json` (both are per machine).
+- **GitHub:** this is a group project. Everyone's filter goes in the shared repo `Apurva-26/Filter-Project`, each in its own folder. This one is in `gun_gun_shoot/`. Run every script from inside that folder (`cd gun_gun_shoot`, then `py game.py`); the files import each other by name (`import features`), not as a package. A launcher UI connecting all the filters comes later. Not committed (`.gitignore`): `__pycache__/`, `.history/`, `data/opponent_memory.json` and `data/distance_calibration.json` (both are per machine).
 
 ## 9. Open questions
 - Tuning the timings (gun gap, shoot gap, grace, capture window, hold, leave-timeout) through real play.

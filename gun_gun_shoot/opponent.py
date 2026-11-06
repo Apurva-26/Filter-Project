@@ -38,8 +38,8 @@ import math
 import os
 import random
 
-import gun_gun_shoot.rules as rules
-from gun_gun_shoot.strategy import Strategy
+import rules
+from strategy import Strategy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEMORY_PATH = os.path.join(HERE, "data", "opponent_memory.json")

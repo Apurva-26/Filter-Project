@@ -38,7 +38,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-import gun_gun_shoot.features as features
+import features
 
 # =============================================================================
 # Settings

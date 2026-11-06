@@ -41,7 +41,7 @@ from collections import deque
 
 import cv2
 
-import gun_gun_shoot.features as features
+import features
 
 CALIBRATION_PATH = os.path.join(features.HERE, "data", "distance_calibration.json")
 
@@ -126,7 +126,7 @@ CALIBRATION_RECORD_S = 3.0   # measure for this long and take the median
 
 
 def calibrate():
-    from gun_gun_shoot.collect import GREEN, RED, WHITE, YELLOW, put_centered, put_text
+    from collect import GREEN, RED, WHITE, YELLOW, put_centered, put_text
 
     parser = argparse.ArgumentParser(description="Calibrate the distance check for this camera.")
     parser.add_argument("--distance", type=float, default=1.24, help="how far you'll stand, in metres")

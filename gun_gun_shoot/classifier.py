@@ -13,7 +13,7 @@ import os
 
 import joblib
 
-import gun_gun_shoot.features as features
+import features
 
 # =============================================================================
 # Settings
