@@ -13,13 +13,11 @@ import urllib.request
 import cv2
 import numpy as np
 
-import kiosk  # touchscreen Back button + on-screen buttons (see kiosk.py)
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, 'face_detection_yunet_2023mar.onnx')
 MODEL_URL = ('https://github.com/opencv/opencv_zoo/raw/main/models/'
              'face_detection_yunet/face_detection_yunet_2023mar.onnx')
-# GLASSES_PATH = os.path.join(SCRIPT_DIR, 'glasses.png')
+GLASSES_PATH = os.path.join(SCRIPT_DIR, 'glasses.png')
 
 WIDTH_SCALE = 2.2
 LENS_Y_RATIO = 0.5
@@ -144,7 +142,7 @@ def enlarge_eye_region(frame, eye_center, radius, scale=1.40):
     frame[dy1:dy2, dx1:dx2] = blended.astype(np.uint8)
 
     return frame
-'''
+
 def overlay_glasses(frame, glasses, left_eye, right_eye):
     dx = right_eye[0] - left_eye[0]
     dy = right_eye[1] - left_eye[1]
@@ -174,12 +172,12 @@ def overlay_glasses(frame, glasses, left_eye, right_eye):
     alpha = warped[:, :, 3:4].astype(np.float32) / 255.0
     blended = frame * (1 - alpha) + warped[:, :, :3] * alpha
     return blended.astype(np.uint8)
-'''
+
 
 def main():
     
     load_model()
-    
+    '''
     glasses = cv2.imread(GLASSES_PATH, cv2.IMREAD_UNCHANGED)
     if glasses is None:
         print(f'Error: Could not load {GLASSES_PATH}')
@@ -188,7 +186,7 @@ def main():
     if glasses.shape[2] != 4:
         print('Error: glasses.png needs a transparent background (4 channels).')
         return
-    
+    '''
     backend = cv2.CAP_DSHOW if sys.platform.startswith('win') else cv2.CAP_ANY
     
     cap = cv2.VideoCapture(0, backend)
@@ -218,29 +216,23 @@ def main():
     detector = cv2.FaceDetectorYN.create(
         MODEL_PATH, '', (640, 480), score_threshold=0.8
     )
-    # On-screen buttons that press the same keys as the 1-4 controls below
-    screen = kiosk.Kiosk('Glasses Filter', buttons=[
-        ("Big Eyes", "1"), ("Glasses", "2"), ("Both", "3"), ("None", "4")])
-
     print()
     print("Press Y to enable the filter.")
     print("Press any other key to exit.")
 
-    # Same question as before, but asked on the screen (a touchscreen has no keyboard):
-    # tap Start or press Y to enable; tap Back or press any other key to exit.
-    if not screen.ask(cap, "Enable the filter?", yes_label="Start", yes_key="y"):
-        cap.release()
-        cv2.destroyAllWindows()
+    if input("> ").strip().lower() != "y":
         return
+    '''
     print("Running.")
-  '''
     print("1 = Big Eyes")
     print("2 = Glasses")
     print("3 = Big Eyes + Glasses")
     print("4 = No Filter")
     print("q = Quit")
-'''
+
     current_filter = 1
+    '''
+    print("Running. Press 'q' to quit.")
     last_faces = None
 
 
@@ -255,7 +247,6 @@ def main():
         detector.setInputSize((w, h))
 
         _, faces = detector.detect(frame)
-        face_seen = faces is not None  # for the auto-back timer (before the last_faces fallback)
         if faces is not None:
             last_faces = faces
         elif last_faces is not None:
@@ -287,24 +278,24 @@ def main():
                 #frame = enlarge_eye_region(frame, left_eye, eye_radius, EYE_SCALE)
                 #frame = enlarge_eye_region(frame, right_eye, eye_radius, EYE_SCALE)
                 # Filter 1 - Big Eyes
-              '''
-                if current_filter == 1:
-'''
-                    frame = enlarge_eye_region(
-                        frame,
-                        left_eye,
-                        eye_radius,
-                        EYE_SCALE
-                    )
+                #if current_filter == 1:
 
-                    frame = enlarge_eye_region(
-                        frame,
-                        right_eye,
-                        eye_radius,
-                        EYE_SCALE
-                    )
-'''
+                frame = enlarge_eye_region(
+                    frame,
+                    left_eye,
+                    eye_radius,
+                    EYE_SCALE
+                )
+
+                frame = enlarge_eye_region(
+                    frame,
+                    right_eye,
+                    eye_radius,
+                    EYE_SCALE
+                )
+
                 # Filter 2 - Glasses
+                '''
                 elif current_filter == 2:
 
                     frame = overlay_glasses(
@@ -341,8 +332,9 @@ def main():
                 # Filter 4 - No Filter
                 elif current_filter == 4:
                     pass
-
+                '''
             #   frame = overlay_glasses(frame, glasses, left_eye, right_eye)
+        '''
         filter_names = {
             1: "Big Eyes",
             2: "Glasses",
@@ -359,8 +351,11 @@ def main():
             (0, 255, 0),
             2
         )
-        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
-        key = screen.show(frame, person_seen=face_seen)
+        '''
+
+        cv2.imshow('Glasses Filter', frame)
+        '''
+        key = cv2.waitKey(1) & 0xFF
 
         if key == ord('1'):
             current_filter = 1
@@ -376,9 +371,10 @@ def main():
 
         elif key == ord('q'):
             break
-        #if cv2.waitKey(1) & 0xFF == ord('q'):
-        #    break
-'''
+        '''
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
     cap.release()
     cv2.destroyAllWindows()
 
