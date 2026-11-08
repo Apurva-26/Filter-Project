@@ -19,7 +19,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, 'face_detection_yunet_2023mar.onnx')
 MODEL_URL = ('https://github.com/opencv/opencv_zoo/raw/main/models/'
              'face_detection_yunet/face_detection_yunet_2023mar.onnx')
-GLASSES_PATH = os.path.join(SCRIPT_DIR, 'glasses.png')
+# GLASSES_PATH = os.path.join(SCRIPT_DIR, 'glasses.png')
 
 WIDTH_SCALE = 2.2
 LENS_Y_RATIO = 0.5
@@ -144,7 +144,7 @@ def enlarge_eye_region(frame, eye_center, radius, scale=1.40):
     frame[dy1:dy2, dx1:dx2] = blended.astype(np.uint8)
 
     return frame
-
+'''
 def overlay_glasses(frame, glasses, left_eye, right_eye):
     dx = right_eye[0] - left_eye[0]
     dy = right_eye[1] - left_eye[1]
@@ -174,7 +174,7 @@ def overlay_glasses(frame, glasses, left_eye, right_eye):
     alpha = warped[:, :, 3:4].astype(np.float32) / 255.0
     blended = frame * (1 - alpha) + warped[:, :, :3] * alpha
     return blended.astype(np.uint8)
-
+'''
 
 def main():
     
@@ -233,12 +233,13 @@ def main():
         cv2.destroyAllWindows()
         return
     print("Running.")
+  '''
     print("1 = Big Eyes")
     print("2 = Glasses")
     print("3 = Big Eyes + Glasses")
     print("4 = No Filter")
     print("q = Quit")
-
+'''
     current_filter = 1
     last_faces = None
 
@@ -286,8 +287,9 @@ def main():
                 #frame = enlarge_eye_region(frame, left_eye, eye_radius, EYE_SCALE)
                 #frame = enlarge_eye_region(frame, right_eye, eye_radius, EYE_SCALE)
                 # Filter 1 - Big Eyes
+              '''
                 if current_filter == 1:
-
+'''
                     frame = enlarge_eye_region(
                         frame,
                         left_eye,
@@ -301,7 +303,7 @@ def main():
                         eye_radius,
                         EYE_SCALE
                     )
-
+'''
                 # Filter 2 - Glasses
                 elif current_filter == 2:
 
@@ -376,7 +378,7 @@ def main():
             break
         #if cv2.waitKey(1) & 0xFF == ord('q'):
         #    break
-
+'''
     cap.release()
     cv2.destroyAllWindows()
 
