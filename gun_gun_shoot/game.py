@@ -16,11 +16,11 @@ Screens (the "state machine"), in the order a player sees them:
   left       the player walked away (or stopped moving) -> back to attract
 
 How the pieces connect:
-  Vision (background thread): camera -> features.py landmarks -> classifier.py move probabilities
+  Vision (2 background threads): camera -> features.py landmarks -> classifier.py move probabilities
   Game (main thread):         screens, timing, sound, rules.py, opponent.py
 
-The camera + MediaPipe run in their own thread so the screen and the beat timing
-stay smooth even if pose detection is slow (e.g. on the Pi).
+The camera and MediaPipe run in their own threads so the video, the screen and the beat
+timing stay smooth even if pose detection is slow (e.g. on the Pi).
 
 Usage:
   py game.py                        laptop: windowed, SPACE to start
@@ -119,7 +119,6 @@ MOVE_COLORS = {
 class VisionResult:
     seq: int                  # increases by 1 every processed frame (so we know when there's a new one)
     time: float               # when the frame was captured (time.monotonic())
-    frame: np.ndarray         # RGB, mirrored, skeleton drawn on: ready to display
     person: bool              # was a person found?
     distance_m: float | None  # estimated distance from the camera (None if the eyes can't be seen)
     nose_y_frac: float | None # how far down the screen the nose is (0 = top, 1 = bottom)
@@ -145,15 +144,35 @@ def check_framing(vis: VisionResult | None, margin: float = 0.0) -> str:
 
 
 class Vision:
-    """Runs the camera and the models nonstop in a background thread.
-    The game just calls latest() whenever it wants the newest result."""
+    """
+    Runs the camera and the models nonstop, in TWO background threads:
 
-    def __init__(self, camera: int, width: int, height: int):
+      camera thread     reads frames as fast as the camera sends them and keeps ONLY the
+                        newest one. It also gets each frame ready for the screen: skeleton
+                        drawn on, mirrored, resized to the screen size, converted to RGB.
+      detection thread  runs MediaPipe + the classifier on the newest frame, over and over.
+
+    Why two threads: detection is the slow part (on the Pi it might manage ~8 frames a
+    second). If the screen only showed frames that detection had finished, the video would
+    be choppy AND late, and OpenCV would queue up old frames, making it even later. Now the
+    video is always live at camera speed. Only the skeleton (and the move detection) is a
+    little behind, by about one detection frame.
+
+    The game calls latest() for the newest detection result, and latest_display()
+    for the newest picture to show.
+    """
+
+    def __init__(self, camera: int, width: int, height: int, display_size: tuple):
         self.cap = cv2.VideoCapture(camera)
+        # MJPG: many USB webcams can only send 5-10 frames a second at 1280x720 in their
+        # default (uncompressed) format, but 30 a second in MJPG.
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # don't let old frames pile up
         if not self.cap.isOpened():
             raise SystemExit(f"Could not open camera {camera}")
+        self.display_size = display_size
 
         # Load the models here (not in the thread) so any error shows up immediately.
         self.classifier = PoseClassifier()
@@ -162,14 +181,20 @@ class Vision:
         self.distance = distance.DistanceEstimator(frame.shape[1] if ok else width)
 
         self.error = None
-        self._latest = None
-        self._lock = threading.Lock()  # stops the two threads touching _latest at the same moment
+        self.camera_fps = 0.0
+        self._lock = threading.Lock()  # stops two threads touching the shared values at once
+        self._frame, self._frame_seq, self._frame_time = None, 0, 0.0  # newest camera frame
+        self._display = None           # (seq, RGB image ready for the screen)
+        self._landmarks = None         # newest landmarks, for drawing the skeleton
+        self._latest = None            # newest VisionResult
         self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        self._threads = [threading.Thread(target=self._camera_loop, daemon=True),
+                         threading.Thread(target=self._detect_loop, daemon=True)]
+        for t in self._threads:
+            t.start()
 
-    def _run(self):
-        seq, fps, last = 0, 0.0, time.monotonic()
+    def _camera_loop(self):
+        last = time.monotonic()
         try:
             while self._running:
                 ok, frame = self.cap.read()
@@ -177,6 +202,35 @@ class Vision:
                     time.sleep(0.01)
                     continue
                 captured = time.monotonic()
+                with self._lock:
+                    self._frame, self._frame_time = frame, captured
+                    self._frame_seq += 1
+                    seq, landmarks = self._frame_seq, self._landmarks
+
+                # Get it ready for the screen (on a copy: detection needs the clean frame)
+                shown = frame.copy()
+                if landmarks is not None:
+                    features.draw(shown, landmarks, show_boxes=False)
+                shown = cv2.resize(cv2.flip(shown, 1), self.display_size, interpolation=cv2.INTER_LINEAR)
+                rgb = cv2.cvtColor(shown, cv2.COLOR_BGR2RGB)
+                with self._lock:
+                    self._display = (seq, rgb)
+
+                self.camera_fps = 0.9 * self.camera_fps + 0.1 / max(captured - last, 1e-6)
+                last = captured
+        except Exception as e:  # hand the error to the main thread so the game stops with a message
+            self.error = e
+
+    def _detect_loop(self):
+        done_seq, fps, last = 0, 0.0, time.monotonic()
+        try:
+            while self._running:
+                with self._lock:
+                    frame, seq, captured = self._frame, self._frame_seq, self._frame_time
+                if frame is None or seq == done_seq:
+                    time.sleep(0.002)  # no new frame yet
+                    continue
+                done_seq = seq
                 h, w = frame.shape[:2]
 
                 landmarks = self.extractor.process(frame)
@@ -184,25 +238,30 @@ class Vision:
                 dist = self.distance.update(landmarks)
                 nose_y = landmarks.pose["nose"][1] / h if landmarks.person_found else None
 
-                features.draw(frame, landmarks, show_boxes=False)
-                rgb = cv2.cvtColor(cv2.flip(frame, 1), cv2.COLOR_BGR2RGB)  # mirror view, RGB for pygame
-
                 now = time.monotonic()
                 fps = 0.9 * fps + 0.1 / max(now - last, 1e-6)
                 last = now
-                seq += 1
+                result = VisionResult(seq, captured, landmarks.person_found, dist, nose_y, probs, fps)
                 with self._lock:
-                    self._latest = VisionResult(seq, captured, rgb, landmarks.person_found, dist, nose_y, probs, fps)
-        except Exception as e:  # hand the error to the main thread so the game stops with a message
+                    self._landmarks = landmarks if landmarks.person_found else None
+                    self._latest = result
+        except Exception as e:
             self.error = e
 
     def latest(self) -> VisionResult | None:
+        """The newest detection result."""
         with self._lock:
             return self._latest
 
+    def latest_display(self):
+        """(seq, RGB image at display_size) for the newest camera frame, or None."""
+        with self._lock:
+            return self._display
+
     def stop(self):
         self._running = False
-        self._thread.join(timeout=2)
+        for t in self._threads:
+            t.join(timeout=2)
         self.cap.release()
         self.extractor.close()
 
@@ -369,6 +428,7 @@ class Game:
         self.last_person_time = time.monotonic()
         self.quit_requested = False     # set by the Back button / auto-back; main() then exits
         self._camera_surface = None     # the camera frame, converted for pygame
+        self._display_seq = -1          # which camera frame _camera_surface is
 
     # --- state helpers ---
 
@@ -446,7 +506,6 @@ class Game:
         new_frame = self.vis is not None and self.vis.seq != self.last_seq
         if new_frame:
             self.last_seq = self.vis.seq
-            self._camera_surface = None  # convert the new frame next time we draw
             if self.vis.person:
                 self.last_person_time = self.vis.time
 
@@ -608,14 +667,15 @@ class Game:
         self._draw_feedback()
 
     def _draw_camera(self):
-        if self.vis is None:
+        display = self.vision.latest_display()
+        if display is None:
             self.screen.fill(BLACK)
             self.paint.text("Starting camera...", (self.paint.w // 2, self.paint.h // 2), 50)
             return
-        if self._camera_surface is None:
-            fh, fw = self.vis.frame.shape[:2]
-            surf = pygame.image.frombuffer(self.vis.frame.tobytes(), (fw, fh), "RGB")
-            self._camera_surface = pygame.transform.scale(surf, (self.paint.w, self.paint.h))
+        seq, rgb = display
+        if seq != self._display_seq:  # a new camera frame: convert it (already screen-sized)
+            self._display_seq = seq
+            self._camera_surface = pygame.image.frombuffer(rgb.tobytes(), (rgb.shape[1], rgb.shape[0]), "RGB")
         self.screen.blit(self._camera_surface, (0, 0))
 
     def _draw_scoreboard(self):
@@ -659,7 +719,9 @@ class Game:
             else:
                 p.text("I see: ---", (p.w // 2, y), 44)
         if self.vis:
-            p.text(f"{self.vis.fps:4.1f} FPS", (15, p.h - 15), 24, GREY, anchor="bottomleft")
+            # detection = how often poses are checked; camera = how smooth the video is
+            p.text(f"detection {self.vis.fps:4.1f} FPS   camera {self.vision.camera_fps:4.1f} FPS",
+                   (15, p.h - 15), 24, GREY, anchor="bottomleft")
 
 
 # =============================================================================
@@ -688,7 +750,7 @@ def main():
     pygame.display.set_caption("")  # no game name shown anywhere while playing
 
     sounds = Sounds()
-    vision = Vision(args.camera, args.width, args.height)
+    vision = Vision(args.camera, args.width, args.height, screen.get_size())
     game = Game(screen, vision, sounds)
     clock = pygame.time.Clock()
 
