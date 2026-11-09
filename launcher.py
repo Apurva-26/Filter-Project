@@ -45,7 +45,7 @@ WINDOW_SIZE = (1280, 720)
 TITLE = "Arcade"
 # >>> The row of symbols under the title, in machine order. Type them in as text, e.g.
 #     SUBTITLE_SYMBOLS = [":)", "<3", ":D", "\U0001F604"]   (or paste real emojis in)
-SUBTITLE_SYMBOLS = [":3", "👍", "♥️", ":D"]
+SUBTITLE_SYMBOLS = [":3", "👍", "🌹", ":D"]
 FOOTNOTE = "The camera only runs while you use a filter. Nothing is recorded or saved."
 
 
