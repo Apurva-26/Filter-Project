@@ -162,7 +162,7 @@ Now it works in four steps:
 - Simulated results (fresh memory, 200 games each): AI wins ~70% vs a random player, 100% vs "always reload", ~85% vs reload-then-shoot, ~87% vs shield-heavy, ~64% vs a rough "normal human" bot. It shields ~15–25% of the time (it used to be most of the time).
 
 ## 7. Screen / UI
-- Built with **pygame** (fullscreen, touch, sound). The camera + MediaPipe run in a background thread so the screen and beat timing stay smooth.
+- Built with **pygame** (fullscreen, touch, sound). Vision runs in **two background threads**: a camera thread keeps only the newest frame and prepares it for the screen, and a detection thread runs MediaPipe + the classifier on the newest frame. The video stays live at camera speed even when detection is slow (added because the Pi view lagged behind the player); only the skeleton and move detection trail by about one detection frame. The camera is asked for MJPG with a 1-frame buffer so old frames don't queue up.
 - **No game name on screen.** The name "Gun Gun Shoot" is internal only (code, docs). The attract screen shows just "Can you beat the computer?" plus the pose guide, and the window title is blank.
 - Screens: attract (tagline + pose guide) → position ("step back", must be framed correctly for 1 s) → ready → beat → SHOOT window → reveal → … → game over (tap to play again, or back to the title screen after 15 s).
 - Framing check: the player must be **1.0–1.5 m** away (§7.1), and the nose must be below the top 18% of the screen (leaving room for reload). Messages: "Too close! Step BACK", "Too far! Come CLOSER", "Look at the screen!" (eyes not visible), "Crouch a little" (head too high). The position screen also shows the estimated distance.
@@ -185,6 +185,7 @@ Now it works in four steps:
 - `features.py`: **shared** code: run the landmarkers, crop hands, map points back, normalize, and build the feature vector. Every other script imports this, so collection and live play are guaranteed to process data identically.
 - `collect.py`: live camera view. Press a key to pick a class, and record labeled rows (raw + normalized landmarks, person ID) to CSV.
 - `collect_none.py`: the same guided session, but records only the `none` class, using 12 everyday non-move prompts × 2 takes (waving, clapping, hands on hips, pretending to look at a phone, etc.). It saves to `<person_id>_none_<date-time>.csv`. Anyone can do it without knowing the game.
+- `collect_shoot.py`: the same guided session, but records only extra shoot data: 5 takes of 3.5 s (right hand once, left hand once, two hands three times; about 17 s in total), because the live game struggles to detect shoots. It saves to `<person_id>_shoot_<date-time>.csv`. Use the person ID that person recorded under before, so the train/test split keeps them on one side.
 - `train.py`: load the CSVs, split by person, train the MLP, print per-class accuracy and a confusion matrix, and save the model.
 - `classifier.py`: `PoseClassifier`, `confident_move()`, `MoveLocker` (hold meter) and **all the beat/lock timing settings**. Shared by `live_test.py` and `game.py`.
 - `distance.py`: eye-based distance estimate and zone check. `py distance.py` = calibration screen.
@@ -197,13 +198,20 @@ Now it works in four steps:
 - **GitHub:** this is a group project. Everyone's filter goes in the shared repo `Apurva-26/Filter-Project`, each in its own folder. This one is in `gun_gun_shoot/`. Run every script from inside that folder (`cd gun_gun_shoot`, then `py game.py`); the files import each other by name (`import features`), not as a package. The shared launcher is described in §8.1. Not committed (`.gitignore`): `__pycache__/`, `.history/`, `data/opponent_memory.json` and `data/distance_calibration.json` (both are per machine).
 
 ### 8.1 Shared launcher (repo root)
-- `launcher.py`: a home screen with one big tile per filter: **Clown Nose** (`ai_updated.py`), **Glasses** (`glasses_filter_updated.py`), **Iris Colors** (`saumyaa.py`) and **Mystery** (this game; it has no name on screen). Headline "Tap a filter to try it!" and footnote "The camera only runs while you use a filter. Nothing is recorded or saved." Tiles have simple drawn icons, so no image files are needed.
+- `launcher.py`: a home screen with one machine per filter (see §8.2): **Clown Nose** (`ai_updated.py`), **Big Eyes** (`glasses_filter_updated.py`), **Iris Colors** (`saumyaa.py`) and **Mystery** (this game; it has no name on screen). Headline "Tap a filter to try it!" and footnote "The camera only runs while you use a filter. Nothing is recorded or saved." Tiles have simple drawn icons, so no image files are needed.
 - Tapping a tile closes the menu window and runs the filter as its **own program** (in its own folder). When the filter exits, the menu comes back. If it crashes, the menu shows "Sorry, X isn't working right now." The menu never opens the camera.
 - The tile list lives in `filters.json` (name, script, icon, color, args, kiosk_args).
 - `py launcher.py --fullscreen` (on the Pi) sets `FILTER_KIOSK=1` for the filters: fullscreen, plus **auto-back after 20 s** with nobody in front of the camera.
-- `kiosk.py`: a shared helper for the OpenCV filters. It adds a **Back button (top-right)** that acts like pressing `q`, **on-screen buttons that press the filter's existing keys** (Clown Nose: On/Off = `n`, Switch = `f`; Glasses: `1`–`4`), and the auto-back. Glasses' terminal "Press Y to enable" question is now asked on screen (Start = `y`). The filters' behavior is otherwise unchanged.
+- `kiosk.py`: a shared helper for the OpenCV filters. It adds a **Back button (top-right)** that acts like pressing `q`, **on-screen buttons that press the filter's existing keys** (Clown Nose: On/Off = `n`, Switch = `f`; Glasses: `1`–`4`), and the auto-back. Big Eyes (`glasses_filter_updated.py`) now opens straight away with only the Back button: its author removed the "Press Y" question and the extra modes. The filters' behavior is otherwise unchanged.
 - This game draws its own Back button (top-right; the CPU scoreboard moved left to make room) and auto-backs after 20 s in kiosk mode. The launcher starts it with `--touch` (and `--fullscreen` in kiosk mode).
 - Model files are committed next to the scripts (`face_detection_yunet_2023mar.onnx`, `face_landmarker.task`), so the Pi needs no internet. Still missing from the repo: `clown nose.png` and `glasses.png`.
+
+### 8.2 Arcade menu
+- A row of arcade machines **replaces** the tile menu (and the carousel idea), so the menu needs no camera. Any tap anywhere on a machine starts it. Drawn entirely in code in `arcade_art.py`; `launcher.py` handles taps and starting filters.
+- Black-and-white line art, with color only on the animated parts. The layout is planned on a design canvas and scaled to fit any screen, keeping proportions; tall screens get rows of two.
+- Title "Arcade" in **Limelight**. Below it, one centered row of 4 symbols from the team, in machine order (`SUBTITLE_SYMBOLS` in `launcher.py`, added later). Plain characters like `:)` use the title font; emojis use the black-and-white **Noto Emoji** font. Both fonts are free (OFL) and live in `assets/fonts/`, so the Pi has them. The privacy line stays at the bottom.
+- Machines, in order: **Clown Nose** (clown face with glasses; red nose pulses and glows), **Big Eyes** (two eyes slowly swell and pop back), **Iris Colors** (an eye whose iris changes color at each blink, using the filter's real three colors) and **Mystery** (same machine, blank screen for now).
+- Still open: the delay while a filter loads, when the menu has closed and the filter hasn't appeared yet.
 
 ## 9. Open questions
 - Tuning the timings (gun gap, shoot gap, grace, capture window, hold, leave-timeout) through real play.

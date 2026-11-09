@@ -2,27 +2,26 @@
   {
     "name": "Clown Nose",
     "script": "ai_updated.py",
-    "icon": "clown",
-    "color": [225, 70, 80]
+    "icon": "clown"
   },
   {
-    "name": "Glasses",
+    "name": "Big Eyes",
     "script": "glasses_filter_updated.py",
-    "icon": "glasses",
-    "color": [60, 130, 230]
+    "icon": "bigeyes"
   },
   {
     "name": "Iris Colors",
     "script": "saumyaa.py",
-    "icon": "iris",
-    "color": [200, 80, 200]
+    "icon": "iris"
   },
   {
     "name": "Mystery",
     "script": "gun_gun_shoot/game.py",
-    "args": ["--touch"],
-    "kiosk_args": ["--fullscreen"],
-    "icon": "mystery",
-    "color": [240, 170, 40]
+    "args": [
+      "--touch"
+    ],
+    "kiosk_args": [
+      "--fullscreen"
+    ]
   }
 ]

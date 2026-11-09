@@ -13,6 +13,8 @@ import urllib.request
 import cv2
 import numpy as np
 
+import kiosk  # touchscreen Back button, fullscreen and auto-back (see kiosk.py)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, 'face_detection_yunet_2023mar.onnx')
 MODEL_URL = ('https://github.com/opencv/opencv_zoo/raw/main/models/'
@@ -235,6 +237,7 @@ def main():
     '''
     print("Running. Press 'q' to quit.")
     last_faces = None
+    screen = kiosk.Kiosk('Glasses Filter')
 
 
 
@@ -248,6 +251,7 @@ def main():
         detector.setInputSize((w, h))
 
         _, faces = detector.detect(frame)
+        face_seen = faces is not None  # for the auto-back timer (before the last_faces fallback)
         if faces is not None:
             last_faces = faces
         elif last_faces is not None:
@@ -354,7 +358,8 @@ def main():
         )
         '''
 
-        cv2.imshow('Glasses Filter', frame)
+        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
+        key = screen.show(frame, person_seen=face_seen)
         '''
         key = cv2.waitKey(1) & 0xFF
 
@@ -373,7 +378,7 @@ def main():
         elif key == ord('q'):
             break
         '''
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if key == ord('q'):
             break
 
     cap.release()
