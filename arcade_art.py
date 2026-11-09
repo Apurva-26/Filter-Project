@@ -49,11 +49,14 @@ EYE_SWELL_S = 3.2         # big eyes: one swell and pop
 EYE_POP_FRACTION = 0.12   # the last part of that cycle is the quick pop back
 BLINK_EVERY_S = 2.4       # iris: time from one blink to the next
 BLINK_LENGTH_S = 0.3      # iris: how long a blink takes
+BAND_PULSE_S = 1.8        # cowboy: one slow pulse of the hat band
+HAT_TILT_DEGREES = -12    # cowboy: how far the hat leans
 
 # The three iris colors the Iris Colors filter really uses (RGB)
 IRIS_COLORS = [(150, 10, 25), (255, 40, 170), (230, 170, 20)]
 CLOWN_RED = (225, 25, 35)
 BIG_EYE_BLUE = (70, 130, 210)
+HAT_BAND_DARK, HAT_BAND_BRIGHT = (140, 15, 30), (235, 35, 50)
 
 
 def load_font(path: str, size: int) -> pygame.font.Font:
@@ -227,7 +230,91 @@ def draw_iris(surf, t: float):
     pygame.draw.lines(surf, INK, True, outline, line)
 
 
-SCREEN_ART = {"clown": draw_clown, "bigeyes": draw_big_eyes, "iris": draw_iris}
+def _spline(points, per_span: int = 12) -> list:
+    """A smooth curve that passes through every given point (a Catmull-Rom spline)."""
+    padded = [points[0]] + list(points) + [points[-1]]   # repeat the ends so the curve reaches them
+    curve = []
+    for i in range(1, len(padded) - 2):
+        p0, p1, p2, p3 = padded[i - 1:i + 3]
+        for step in range(per_span):
+            t = step / per_span
+            curve.append(tuple(0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t
+                                      + (3 * b - a - 3 * c + d) * t * t * t)
+                               for a, b, c, d in zip(p0, p1, p2, p3)))
+    curve.append(tuple(points[-1]))
+    return curve
+
+
+def _cowboy_static(size) -> tuple:
+    """The parts of the cowboy hat that never change, plus the outline of its band.
+
+    The hat is planned around (0, 0), in fractions of the screen height, then tilted.
+    Returns (picture of the hat, the band's pixel outline, line thickness)."""
+    w, h = size
+    layer = pygame.Surface(size)
+    layer.fill(PAPER)
+    line = max(2, int(h * 0.03))
+    tilt = math.radians(HAT_TILT_DEGREES)
+
+    def place(points):
+        """Planned points -> pixel positions: shrink, tilt, then move to the screen's center."""
+        pixels = []
+        for x, y in points:
+            x, y = x * h * 0.86, (y + 0.09) * h * 0.86        # +0.09 centers the hat up and down
+            pixels.append((int(w / 2 + x * math.cos(tilt) - y * math.sin(tilt)),
+                           int(h / 2 + x * math.sin(tilt) + y * math.cos(tilt))))
+        return pixels
+
+    def shape(points):
+        """A white shape with a thick black edge."""
+        pixels = place(points)
+        pygame.draw.polygon(layer, PAPER, pixels)
+        pygame.draw.lines(layer, INK, True, pixels, line)
+        for point in pixels:
+            pygame.draw.circle(layer, INK, point, line // 2)
+
+    def stroke(points):
+        """A smooth black line with rounded ends."""
+        pixels = place(_spline(points))
+        pygame.draw.lines(layer, INK, False, pixels, line)
+        for point in pixels:
+            pygame.draw.circle(layer, INK, point, line // 2)
+
+    # The brim: round, upturned sides and a front edge that dips. Starting at the back
+    # middle means the only joint in the curve ends up hidden behind the crown.
+    shape(_spline([(0, -0.08), (0.28, -0.08), (0.42, -0.16), (0.53, -0.17), (0.59, -0.03), (0.47, 0.13),
+                   (0.25, 0.23), (0, 0.26), (-0.25, 0.23), (-0.47, 0.13), (-0.59, -0.03),
+                   (-0.53, -0.17), (-0.42, -0.16), (-0.28, -0.08), (0, -0.08)]))
+    stroke([(0.51, -0.08), (0.43, 0.03), (0.32, 0.10)])        # the curl of each side
+    stroke([(-0.51, -0.08), (-0.43, 0.03), (-0.32, 0.10)])
+
+    # The crown: two rounded peaks with a pinch between them, and a curved bottom edge
+    crown = _spline([(-0.27, 0.06), (-0.28, -0.18), (-0.24, -0.36), (-0.13, -0.45), (0, -0.38),
+                     (0.13, -0.45), (0.24, -0.36), (0.28, -0.18), (0.27, 0.06)])
+    shape(crown + _spline([(0.27, 0.06), (0, 0.15), (-0.27, 0.06)]))
+    stroke([(0, -0.38), (0, -0.27)])                           # the crease under the pinch
+
+    # The band gets colored in every frame, so here we only work out where it goes
+    band = _spline([(-0.275, -0.07), (0, 0.02), (0.275, -0.07)]) + _spline([(0.27, 0.06), (0, 0.15), (-0.27, 0.06)])
+    return layer, place(band), line
+
+
+def draw_cowboy(surf, t: float):
+    """A line-art cowboy hat whose band slowly pulses between dark and bright red."""
+    size = surf.get_size()
+    key = ("cowboy", size)
+    if key not in _static_layers:
+        _static_layers[key] = _cowboy_static(size)
+    layer, band, line = _static_layers[key]
+    surf.blit(layer, (0, 0))
+
+    pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi / BAND_PULSE_S)   # goes 0 -> 1 -> 0
+    color = [int(dark + (bright - dark) * pulse) for dark, bright in zip(HAT_BAND_DARK, HAT_BAND_BRIGHT)]
+    pygame.draw.polygon(surf, color, band)
+    pygame.draw.lines(surf, INK, True, band, line)
+
+
+SCREEN_ART = {"clown": draw_clown, "bigeyes": draw_big_eyes, "iris": draw_iris, "cowboy": draw_cowboy}
 
 
 # =============================================================================

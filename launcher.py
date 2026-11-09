@@ -20,7 +20,7 @@ Usage:
 Adding a filter: add an entry to filters.json:
   "name"        text on top of the machine
   "script"      the .py file to run, relative to this folder
-  "icon"        which animation its screen shows: clown / bigeyes / iris (see SCREEN_ART
+  "icon"        which picture its screen shows: clown / bigeyes / iris / cowboy (see SCREEN_ART
                 in arcade_art.py). Leave it out for a blank screen.
   "args"        (optional) extra command-line arguments for the script
   "kiosk_args"  (optional) extra arguments used only with --fullscreen
