@@ -15,8 +15,9 @@
     "icon": "iris"
   },
   {
-    "name": "Mystery",
+    "name": "Cowboy",
     "script": "gun_gun_shoot/game.py",
+    "icon": "cowboy",
     "args": [
       "--touch"
     ],
