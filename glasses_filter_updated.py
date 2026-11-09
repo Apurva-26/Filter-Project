@@ -37,6 +37,31 @@ def load_model() -> None:
     urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
     print('Done.')
 
+
+def blur_face(frame, bbox) -> None:
+    """Blur a face bounding box (x, y, w, h) with 15% padding."""
+    x, y, w, h = bbox
+    pad_w, pad_h = int(w * 0.15), int(h * 0.15)
+    f_h, f_w = frame.shape[:2]
+    x1, y1 = max(0, x - pad_w), max(0, y - pad_h)
+    x2, y2 = min(f_w, x + w + pad_w), min(f_h, y + h + pad_h)
+    if x2 > x1 and y2 > y1:
+        frame[y1:y2, x1:x2] = cv2.GaussianBlur(frame[y1:y2, x1:x2], (51, 51), 30)
+
+
+def draw_too_close(frame) -> None:
+    """Big centered warning banner when someone stands closer than MAX_FACE_WIDTH."""
+    text = "Too close! Step back."
+    font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 1.2 * frame.shape[1] / 1280 + 0.4, 3
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
+    x = (frame.shape[1] - tw) // 2
+    y = int(frame.shape[0] * 0.30)
+    x1, y1 = max(0, x - 24), max(0, y - th - 20)
+    x2, y2 = min(frame.shape[1], x + tw + 24), y + 20
+    frame[y1:y2, x1:x2] = (frame[y1:y2, x1:x2] * 0.35 + np.array([0, 0, 160]) * 0.65).astype(np.uint8)
+    cv2.putText(frame, text, (x, y), font, scale, (255, 255, 255), thick, cv2.LINE_AA)
+
+
 '''
 def enlarge_eye_region(frame, eye_center, radius, scale=1.10):
     x, y = int(eye_center[0]), int(eye_center[1])
@@ -215,8 +240,9 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
+    # Lowered score_threshold to 0.6 so far/angled bystander faces are detected and blurred
     detector = cv2.FaceDetectorYN.create(
-        MODEL_PATH, '', (640, 480), score_threshold=0.8
+        MODEL_PATH, '', (640, 480), score_threshold=0.6
     )
     '''
     print()
@@ -239,8 +265,6 @@ def main():
     last_faces = None
     screen = kiosk.Kiosk('Glasses Filter')
 
-
-
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -256,12 +280,20 @@ def main():
             last_faces = faces
         elif last_faces is not None:
             faces = last_faces
+
+        too_close = False
         if faces is not None:
             for face in faces:
+                bbox = (int(face[0]), int(face[1]), int(face[2]), int(face[3]))
                 face_width = face[2]
 
+                # Blur faces that are too close or too far
                 if not (MIN_FACE_WIDTH <= face_width <= MAX_FACE_WIDTH):
+                    if face_width > MAX_FACE_WIDTH:
+                        too_close = True
+                    blur_face(frame, bbox)
                     continue
+
                 face_x = face[0]
                 face_center_x = face_x + face_width / 2
 
@@ -269,8 +301,11 @@ def main():
                     face_center_x - (w / 2)
                 ) / (w / 2)
 
+                # Blur faces that are outside the horizontal center zone
                 if normalized_offset > FRAME_CENTER_TOLERANCE:
+                    blur_face(frame, bbox)
                     continue
+
                 eye_a = (face[4], face[5])
                 eye_b = (face[6], face[7])
                 left_eye, right_eye = sorted([eye_a, eye_b])
@@ -339,6 +374,10 @@ def main():
                     pass
                 '''
             #   frame = overlay_glasses(frame, glasses, left_eye, right_eye)
+
+        if too_close:
+            draw_too_close(frame)
+
         '''
         filter_names = {
             1: "Big Eyes",
