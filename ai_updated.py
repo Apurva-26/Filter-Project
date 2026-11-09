@@ -18,7 +18,7 @@ MODEL_URL = (
     "face_detection_yunet/face_detection_yunet_2023mar.onnx"
 )
 
-CLOWN_NOSE_PATH = os.path.join(SCRIPT_DIR, "clown nose.png")
+CLOWN_NOSE_PATH = os.path.join(SCRIPT_DIR, "clown_nose.png")
 
 
 def load_model() -> None:
