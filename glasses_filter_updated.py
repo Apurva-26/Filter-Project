@@ -216,13 +216,14 @@ def main():
     detector = cv2.FaceDetectorYN.create(
         MODEL_PATH, '', (640, 480), score_threshold=0.8
     )
+    '''
     print()
     print("Press Y to enable the filter.")
     print("Press any other key to exit.")
 
     if input("> ").strip().lower() != "y":
         return
-    '''
+    
     print("Running.")
     print("1 = Big Eyes")
     print("2 = Glasses")
