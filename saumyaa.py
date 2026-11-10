@@ -36,6 +36,8 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 import numpy as np
 
+import kiosk  # touchscreen Back button, fullscreen and auto-back (see kiosk.py)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TASK_PATH = os.path.join(SCRIPT_DIR, "face_landmarker.task")
 TASK_URL = (
@@ -1304,13 +1306,10 @@ def main():
     people = []
     ui = {"mode": 1, "color_idx": 0, "buttons": {}, "flash_btn": None, "flash_time": 0.0}
 
-    def on_touch(event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:          # finger tap or mouse click
-            handle_tap(ui, people, color_names, x, y)
-
-    cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
-    cv2.setMouseCallback(WINDOW, on_touch)
-    print("Running.  Tap the on-screen < > arrows, or use the keyboard:")
+    # kiosk.py makes the window, draws the Back button (top-right) and handles
+    # fullscreen + auto-back. Taps that miss Back are passed on to our < > arrows.
+    screen = kiosk.Kiosk(WINDOW, on_tap=lambda x, y: handle_tap(ui, people, color_names, x, y))
+    print("Running.  Tap the on-screen < > arrows or Back, or use the keyboard:")
     print("  1 = Bright mode, 2 = Dark mode, C = next color, Q/Esc = quit.")
 
     while True:
@@ -1336,8 +1335,9 @@ def main():
             draw_too_close(frame)
         draw_touch_ui(frame, ui, color_names, irises, active, now)
 
-        cv2.imshow(WINDOW, frame)
-        key = cv2.waitKey(1) & 0xFF
+        # Shows the frame (like cv2.imshow) and returns the key pressed or tapped
+        person_seen = bool(face_data) or len(extra_faces) > 0
+        key = screen.show(frame, person_seen=person_seen)
         if key in (ord('q'), ord('Q'), 27):
             break
         if key == ord('1'):

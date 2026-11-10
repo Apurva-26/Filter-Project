@@ -41,10 +41,13 @@ TEXT_COLOR = (255, 255, 255)
 
 
 class Kiosk:
-    def __init__(self, window_name: str, buttons=()):
-        """buttons: list of (label, key) pairs, e.g. [("Glasses", "2")]."""
+    def __init__(self, window_name: str, buttons=(), on_tap=None):
+        """buttons: list of (label, key) pairs, e.g. [("Glasses", "2")].
+        on_tap: optional function(x, y) for a filter that draws its own touch buttons.
+                Taps that miss Back and the kiosk buttons are passed to it."""
         self.window = window_name
         self.buttons = [(label, ord(key)) for label, key in buttons]
+        self.on_tap = on_tap
         self._rects = []            # [(x1, y1, x2, y2, key)] for the frame just drawn
         self._taps = []             # taps not handled yet, in image coordinates
         self._last_person = time.monotonic()
@@ -112,9 +115,13 @@ class Kiosk:
         key = cv2.waitKey(1) & 0xFF   # taps are collected while this runs
 
         for tx, ty in self._taps:
+            hit = False
             for x1, y1, x2, y2, button_key in self._rects:
                 if x1 <= tx <= x2 and y1 <= ty <= y2:
                     key = button_key
+                    hit = True
+            if not hit and self.on_tap is not None:
+                self.on_tap(tx, ty)   # the filter's own buttons
         self._taps.clear()
 
         if key in [k for _, k in self.buttons]:
