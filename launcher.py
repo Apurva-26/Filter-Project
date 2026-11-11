@@ -44,7 +44,6 @@ FILTERS_PATH = os.path.join(HERE, "filters.json")
 WINDOW_SIZE = (1280, 720)
 TITLE = "Arcade"
 # >>> The row of symbols under the title, in machine order. Type them in as text, e.g.
-#     SUBTITLE_SYMBOLS = [":)", "<3", ":D", "\U0001F604"]   (or paste real emojis in)
 SUBTITLE_SYMBOLS = [":3", "👍", "🌹", ":D"]
 FOOTNOTE = "The camera only runs while you use a filter. Nothing is recorded or saved."
 
@@ -130,13 +129,8 @@ def main():
             except OSError as e:
                 print(f"Couldn't start {filters[chosen]['name']}: {e}")
                 code = -1
-            screen = open_window(args.fullscreen)
-            if screen.get_size() != arcade.size:
-                arcade = Arcade(filters, screen.get_size(), TITLE, SUBTITLE_SYMBOLS, FOOTNOTE)
-            pygame.event.clear()  # ignore taps made while the filter was closing
-            if code != 0:
-                message = f"Sorry, {filters[chosen]['name']} isn't working right now."
-                message_until = time.monotonic() + 4
+            pygame.quit()
+            os.execv(sys.executable, [sys.executable, *sys.argv])
 
         clock.tick(30)
 
